@@ -81,7 +81,7 @@ The script will:
 Press `Shift + F10` to open Command Prompt, then run:
 
 ```cmd
-powershell -ExecutionPolicy Bypass -Command "irm https://tinyurl.com/Aunalytics-APDeploy | iex"
+powershell -ExecutionPolicy Bypass -Command "irm https://tinyurl.com/AUAPOOBE | iex"
 ```
 
 Or use the direct URL:
