@@ -268,14 +268,15 @@ function Start-AutopilotDeployment {
 
         $state.AdvanceTo([DeploymentPhase]::OOBELaunch)
 
+        # Re-enable WAM before AutopilotOOBE - it uses its own interactive
+        # Graph auth which requires WAM. Our Key Vault auth is already done.
+        Write-AutopilotLog -Level Info -Message "Restoring WAM for AutopilotOOBE interactive auth" -Phase 'Enrollment'
+        Set-WAMState -Enabled $true
+
         Register-AutopilotDevice -Config $config
 
         # ==================== COMPLETION ====================
         $state.MarkCompleted()
-
-        Write-Host ""
-        Write-AutopilotLog -Level Info -Message "Restoring Web Account Manager (WAM)" -Phase 'Cleanup'
-        Set-WAMState -Enabled $true
 
         Write-AutopilotLog -Level Info -Message "Autopilot deployment completed successfully" -Phase 'Complete'
     }
