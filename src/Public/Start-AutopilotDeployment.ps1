@@ -154,7 +154,7 @@ function Start-AutopilotDeployment {
 
         if (-not $state.ShouldSkip([DeploymentPhase]::AzureAuthentication)) {
             Write-Host ""
-            Connect-AzureKeyVault -SubscriptionId $config.KeyVault.SubscriptionId
+            Connect-AzureKeyVault -SubscriptionId $config.KeyVault.SubscriptionId -TenantId $config.TenantId
             $state.RecordPhaseResult([DeploymentPhase]::AzureAuthentication, $true)
         }
 

@@ -13,18 +13,24 @@ function Connect-AzureKeyVault {
     .PARAMETER SubscriptionId
         Optional Azure subscription ID. If not specified, uses the default subscription.
 
+    .PARAMETER TenantId
+        Optional Azure tenant ID. Ensures device code auth targets the correct tenant.
+
     .OUTPUTS
         [bool] True if connected successfully, throws on failure.
 
     .EXAMPLE
         Connect-AzureKeyVault
-        Connect-AzureKeyVault -SubscriptionId '00000000-0000-0000-0000-000000000000'
+        Connect-AzureKeyVault -SubscriptionId '00000000-0000-0000-0000-000000000000' -TenantId '00000000-0000-0000-0000-000000000000'
     #>
     [CmdletBinding()]
     [OutputType([bool])]
     param(
         [Parameter()]
-        [string]$SubscriptionId
+        [string]$SubscriptionId,
+
+        [Parameter()]
+        [string]$TenantId
     )
 
     Write-AutopilotLog -Level Info -Message "Establishing Azure connection for Key Vault access" -Phase 'Authentication'
@@ -63,6 +69,10 @@ function Connect-AzureKeyVault {
     $connectParams = @{
         DeviceCode  = $true
         ErrorAction = 'Stop'
+    }
+
+    if ($TenantId) {
+        $connectParams['Tenant'] = $TenantId
     }
 
     if ($SubscriptionId) {

@@ -116,7 +116,7 @@ function Test-AutopilotPrerequisites {
     # ==================== AZURE AUTH ====================
     Write-Host "4. Azure Authentication" -ForegroundColor Yellow
     try {
-        Connect-AzureKeyVault -SubscriptionId $config.KeyVault.SubscriptionId
+        Connect-AzureKeyVault -SubscriptionId $config.KeyVault.SubscriptionId -TenantId $config.TenantId
         Write-Host "   [PASS] Azure authentication successful" -ForegroundColor Green
         $results.AzureAuth = @{ Status = 'Pass' }
     }
