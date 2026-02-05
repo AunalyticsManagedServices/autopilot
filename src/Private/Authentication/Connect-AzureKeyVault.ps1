@@ -4,12 +4,15 @@ function Connect-AzureKeyVault {
         Establishes a connection to Azure for Key Vault access.
 
     .DESCRIPTION
-        Connects to Azure using device code flow authentication.
-        This is designed for OOBE scenarios where interactive browser-based
-        authentication may not be available.
+        Connects to Azure using device code flow authentication with Key Vault
+        auth scope. Designed for OOBE scenarios where interactive browser-based
+        authentication is not available.
 
-        Returns the Azure context object for use with -DefaultProfile on
-        subsequent Az cmdlets, bypassing token cache issues during OOBE.
+        Disables WAM and LoginExperienceV2 which interfere with OOBE environments,
+        and uses -AuthScope AzureKeyVaultServiceEndpointResourceId to ensure the
+        token covers Key Vault data plane operations (not just ARM).
+
+        Returns the Azure context object for use with -DefaultProfile.
 
     .PARAMETER SubscriptionId
         Optional Azure subscription ID. If not specified, uses the default subscription.
@@ -34,38 +37,18 @@ function Connect-AzureKeyVault {
 
     Write-AutopilotLog -Level Info -Message "Establishing Azure connection for Key Vault access" -Phase 'Authentication'
 
-    # Disable WAM broker to prevent token cache issues during OOBE
+    # Disable WAM broker and new login experience - required for OOBE environments
+    # See: https://github.com/Azure/azure-powershell/issues/24962
     $env:AZURE_BROKER_ENABLED = '0'
     try {
-        Update-AzConfig -EnableLoginByWam $false -ErrorAction SilentlyContinue | Out-Null
+        Update-AzConfig -EnableLoginByWam $false -LoginExperienceV2 'Off' -ErrorAction SilentlyContinue | Out-Null
     }
     catch { }
 
-    # Check if already connected
-    $context = Get-AzContext -ErrorAction SilentlyContinue
+    # Clear any stale context to prevent token cache issues
+    Clear-AzContext -Scope Process -Force -ErrorAction SilentlyContinue | Out-Null
 
-    if ($context) {
-        Write-AutopilotLog -Level Debug -Message "Existing Azure context found" -Phase 'Authentication' -Data @{
-            Account      = $context.Account.Id
-            Subscription = $context.Subscription.Name
-            TenantId     = $context.Tenant.Id
-        }
-
-        # If subscription specified, ensure we're in the right one
-        if ($SubscriptionId -and $context.Subscription.Id -ne $SubscriptionId) {
-            Write-AutopilotLog -Level Info -Message "Switching to specified subscription: $SubscriptionId" -Phase 'Authentication'
-            try {
-                $context = (Set-AzContext -SubscriptionId $SubscriptionId -ErrorAction Stop)
-            }
-            catch {
-                throw "Failed to switch to subscription '$SubscriptionId': $($_.Exception.Message)"
-            }
-        }
-
-        return $context
-    }
-
-    # Not connected - initiate device code flow
+    # Initiate device code flow with Key Vault auth scope
     Write-AutopilotLog -Level Info -Message "Initiating Azure device code authentication..." -Phase 'Authentication'
     Write-Host ""
     Write-Host "Azure authentication required for Key Vault access." -ForegroundColor Yellow
@@ -73,8 +56,9 @@ function Connect-AzureKeyVault {
     Write-Host ""
 
     $connectParams = @{
-        DeviceCode  = $true
-        ErrorAction = 'Stop'
+        UseDeviceAuthentication = $true
+        AuthScope               = 'AzureKeyVaultServiceEndpointResourceId'
+        ErrorAction             = 'Stop'
     }
 
     if ($TenantId) {
