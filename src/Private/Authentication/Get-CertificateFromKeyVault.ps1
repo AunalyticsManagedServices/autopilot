@@ -60,17 +60,19 @@ function Get-CertificateFromKeyVault {
         PasswordSecret = $PasswordSecretName
     }
 
-    # Build common params for Key Vault calls
-    $kvParams = @{ ErrorAction = 'Stop' }
+    # Build params for Key Vault calls (direct calls, no scriptblock wrapper)
+    $kvParams = @{
+        VaultName   = $VaultName
+        AsPlainText = $true
+        ErrorAction = 'Stop'
+    }
     if ($AzureContext) {
         $kvParams['DefaultProfile'] = $AzureContext
         Write-AutopilotLog -Level Debug -Message "Using explicit Azure context: $($AzureContext.Account.Id)" -Phase 'Authentication'
     }
 
     # Retrieve the Base64-encoded PFX
-    $certSecret = Invoke-WithRetry -OperationName 'Get certificate secret' -ScriptBlock {
-        Get-AzKeyVaultSecret -VaultName $VaultName -Name $CertSecretName -AsPlainText @kvParams
-    }
+    $certSecret = Get-AzKeyVaultSecret @kvParams -Name $CertSecretName
 
     if (-not $certSecret) {
         throw "Certificate secret '$CertSecretName' not found in Key Vault '$VaultName'"
@@ -79,9 +81,7 @@ function Get-CertificateFromKeyVault {
     Write-AutopilotLog -Level Debug -Message "Certificate secret retrieved successfully" -Phase 'Authentication'
 
     # Retrieve the password
-    $passwordSecret = Invoke-WithRetry -OperationName 'Get password secret' -ScriptBlock {
-        Get-AzKeyVaultSecret -VaultName $VaultName -Name $PasswordSecretName -AsPlainText @kvParams
-    }
+    $passwordSecret = Get-AzKeyVaultSecret @kvParams -Name $PasswordSecretName
 
     if (-not $passwordSecret) {
         throw "Password secret '$PasswordSecretName' not found in Key Vault '$VaultName'"
