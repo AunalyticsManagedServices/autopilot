@@ -53,6 +53,13 @@ function Get-CertificateFromKeyVault {
         PasswordSecret = $PasswordSecretName
     }
 
+    # Verify Azure context is still active before Key Vault call
+    $azContext = Get-AzContext -ErrorAction SilentlyContinue
+    if (-not $azContext) {
+        throw "Azure context lost before Key Vault access. Please re-run the deployment to re-authenticate."
+    }
+    Write-AutopilotLog -Level Debug -Message "Azure context verified: $($azContext.Account.Id)" -Phase 'Authentication'
+
     # Retrieve the Base64-encoded PFX
     $certSecret = Invoke-WithRetry -OperationName 'Get certificate secret' -ScriptBlock {
         Get-AzKeyVaultSecret -VaultName $VaultName -Name $CertSecretName -AsPlainText -ErrorAction Stop

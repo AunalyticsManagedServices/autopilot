@@ -66,6 +66,15 @@ function Connect-AzureKeyVault {
     Write-Host "Please follow the device code instructions below:" -ForegroundColor Yellow
     Write-Host ""
 
+    # Disable WAM broker at the Az module level to prevent token cache issues during OOBE
+    try {
+        Update-AzConfig -EnableLoginByWam $false -ErrorAction SilentlyContinue | Out-Null
+    }
+    catch {
+        # Fallback for older Az.Accounts versions
+        $env:AZURE_BROKER_ENABLED = '0'
+    }
+
     $connectParams = @{
         DeviceCode  = $true
         ErrorAction = 'Stop'
