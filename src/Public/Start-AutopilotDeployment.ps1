@@ -130,6 +130,12 @@ function Start-AutopilotDeployment {
                 throw "Failed to install required modules"
             }
 
+            # Disable WAM broker BEFORE importing Az modules to prevent
+            # Azure.Identity.Broker DLL from loading and causing
+            # SharedTokenCacheCredentialBrokerOptions errors during OOBE
+            $env:AZURE_BROKER_ENABLED = '0'
+            try { Update-AzConfig -EnableLoginByWam $false -LoginExperienceV2 'Off' -ErrorAction SilentlyContinue | Out-Null } catch { }
+
             # Import modules
             Write-AutopilotLog -Level Info -Message "Importing modules" -Phase 'Modules'
             Import-Module 'Microsoft.Graph.Authentication' -Force

@@ -21,6 +21,10 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Disable WAM broker at the earliest possible point, BEFORE any Az modules load
+# Prevents Azure.Identity.Broker DLL from causing SharedTokenCacheCredentialBrokerOptions errors
+$env:AZURE_BROKER_ENABLED = '0'
+
 Write-Host ""
 Write-Host "Autopilot OOBE Bootstrap" -ForegroundColor Cyan
 Write-Host "========================" -ForegroundColor Cyan
