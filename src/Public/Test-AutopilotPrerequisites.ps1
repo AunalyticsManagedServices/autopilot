@@ -115,8 +115,9 @@ function Test-AutopilotPrerequisites {
 
     # ==================== AZURE AUTH ====================
     Write-Host "4. Azure Authentication" -ForegroundColor Yellow
+    $azContext = $null
     try {
-        Connect-AzureKeyVault -SubscriptionId $config.KeyVault.SubscriptionId -TenantId $config.TenantId
+        $azContext = Connect-AzureKeyVault -SubscriptionId $config.KeyVault.SubscriptionId -TenantId $config.TenantId
         Write-Host "   [PASS] Azure authentication successful" -ForegroundColor Green
         $results.AzureAuth = @{ Status = 'Pass' }
     }
@@ -132,7 +133,9 @@ function Test-AutopilotPrerequisites {
     if ($results.AzureAuth.Status -eq 'Pass') {
         try {
             # Test Key Vault access
-            $secrets = Get-AzKeyVaultSecret -VaultName $config.KeyVault.Name -ErrorAction Stop | Select-Object -First 1
+            $kvTestParams = @{ VaultName = $config.KeyVault.Name; ErrorAction = 'Stop' }
+            if ($azContext) { $kvTestParams['DefaultProfile'] = $azContext }
+            $secrets = Get-AzKeyVaultSecret @kvTestParams | Select-Object -First 1
             Write-Host "   [PASS] Key Vault accessible: $($config.KeyVault.Name)" -ForegroundColor Green
             $results.KeyVault = @{ Status = 'Pass'; VaultName = $config.KeyVault.Name }
         }

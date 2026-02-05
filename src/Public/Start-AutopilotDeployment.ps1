@@ -154,7 +154,7 @@ function Start-AutopilotDeployment {
 
         if (-not $state.ShouldSkip([DeploymentPhase]::AzureAuthentication)) {
             Write-Host ""
-            Connect-AzureKeyVault -SubscriptionId $config.KeyVault.SubscriptionId -TenantId $config.TenantId
+            $azContext = Connect-AzureKeyVault -SubscriptionId $config.KeyVault.SubscriptionId -TenantId $config.TenantId
             $state.RecordPhaseResult([DeploymentPhase]::AzureAuthentication, $true)
         }
 
@@ -166,7 +166,8 @@ function Start-AutopilotDeployment {
         $cert = Get-CertificateFromKeyVault `
             -VaultName $config.KeyVault.Name `
             -CertSecretName $config.KeyVault.CertSecretName `
-            -PasswordSecretName $config.KeyVault.PasswordSecretName
+            -PasswordSecretName $config.KeyVault.PasswordSecretName `
+            -AzureContext $azContext
 
         $state.RecordPhaseResult([DeploymentPhase]::KeyVaultAccess, $true)
 

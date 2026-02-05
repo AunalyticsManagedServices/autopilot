@@ -39,13 +39,14 @@ function Get-CertificateFromConfig {
 
     # Connect to Azure for Key Vault access
     $subscriptionId = $Config.KeyVault.SubscriptionId
-    Connect-AzureKeyVault -SubscriptionId $subscriptionId -TenantId $Config.TenantId
+    $azContext = Connect-AzureKeyVault -SubscriptionId $subscriptionId -TenantId $Config.TenantId
 
     # Retrieve certificate from Key Vault
     $cert = Get-CertificateFromKeyVault `
         -VaultName $Config.KeyVault.Name `
         -CertSecretName $Config.KeyVault.CertSecretName `
-        -PasswordSecretName $Config.KeyVault.PasswordSecretName
+        -PasswordSecretName $Config.KeyVault.PasswordSecretName `
+        -AzureContext $azContext
 
     return $cert
 }

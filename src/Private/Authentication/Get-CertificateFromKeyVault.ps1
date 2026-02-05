@@ -20,6 +20,10 @@ function Get-CertificateFromKeyVault {
         The name of the secret containing the PFX password.
         Defaults to '{CertSecretName}-Password'.
 
+    .PARAMETER AzureContext
+        Azure context object from Connect-AzureKeyVault. Used with -DefaultProfile
+        to bypass token cache issues during OOBE.
+
     .OUTPUTS
         [System.Security.Cryptography.X509Certificates.X509Certificate2]
 
@@ -39,7 +43,10 @@ function Get-CertificateFromKeyVault {
         [string]$CertSecretName,
 
         [Parameter()]
-        [string]$PasswordSecretName
+        [string]$PasswordSecretName,
+
+        [Parameter()]
+        [object]$AzureContext
     )
 
     # Default password secret name
@@ -53,16 +60,16 @@ function Get-CertificateFromKeyVault {
         PasswordSecret = $PasswordSecretName
     }
 
-    # Verify Azure context is still active before Key Vault call
-    $azContext = Get-AzContext -ErrorAction SilentlyContinue
-    if (-not $azContext) {
-        throw "Azure context lost before Key Vault access. Please re-run the deployment to re-authenticate."
+    # Build common params for Key Vault calls
+    $kvParams = @{ ErrorAction = 'Stop' }
+    if ($AzureContext) {
+        $kvParams['DefaultProfile'] = $AzureContext
+        Write-AutopilotLog -Level Debug -Message "Using explicit Azure context: $($AzureContext.Account.Id)" -Phase 'Authentication'
     }
-    Write-AutopilotLog -Level Debug -Message "Azure context verified: $($azContext.Account.Id)" -Phase 'Authentication'
 
     # Retrieve the Base64-encoded PFX
     $certSecret = Invoke-WithRetry -OperationName 'Get certificate secret' -ScriptBlock {
-        Get-AzKeyVaultSecret -VaultName $VaultName -Name $CertSecretName -AsPlainText -ErrorAction Stop
+        Get-AzKeyVaultSecret -VaultName $VaultName -Name $CertSecretName -AsPlainText @kvParams
     }
 
     if (-not $certSecret) {
@@ -73,7 +80,7 @@ function Get-CertificateFromKeyVault {
 
     # Retrieve the password
     $passwordSecret = Invoke-WithRetry -OperationName 'Get password secret' -ScriptBlock {
-        Get-AzKeyVaultSecret -VaultName $VaultName -Name $PasswordSecretName -AsPlainText -ErrorAction Stop
+        Get-AzKeyVaultSecret -VaultName $VaultName -Name $PasswordSecretName -AsPlainText @kvParams
     }
 
     if (-not $passwordSecret) {

@@ -8,7 +8,8 @@ function Connect-AzureKeyVault {
         This is designed for OOBE scenarios where interactive browser-based
         authentication may not be available.
 
-        If already connected to Azure, validates the connection is still valid.
+        Returns the Azure context object for use with -DefaultProfile on
+        subsequent Az cmdlets, bypassing token cache issues during OOBE.
 
     .PARAMETER SubscriptionId
         Optional Azure subscription ID. If not specified, uses the default subscription.
@@ -17,14 +18,12 @@ function Connect-AzureKeyVault {
         Optional Azure tenant ID. Ensures device code auth targets the correct tenant.
 
     .OUTPUTS
-        [bool] True if connected successfully, throws on failure.
+        [Microsoft.Azure.Commands.Profile.Models.Core.PSAzureContext]
 
     .EXAMPLE
-        Connect-AzureKeyVault
-        Connect-AzureKeyVault -SubscriptionId '00000000-0000-0000-0000-000000000000' -TenantId '00000000-0000-0000-0000-000000000000'
+        $ctx = Connect-AzureKeyVault -SubscriptionId '...' -TenantId '...'
     #>
     [CmdletBinding()]
-    [OutputType([bool])]
     param(
         [Parameter()]
         [string]$SubscriptionId,
@@ -34,6 +33,13 @@ function Connect-AzureKeyVault {
     )
 
     Write-AutopilotLog -Level Info -Message "Establishing Azure connection for Key Vault access" -Phase 'Authentication'
+
+    # Disable WAM broker to prevent token cache issues during OOBE
+    $env:AZURE_BROKER_ENABLED = '0'
+    try {
+        Update-AzConfig -EnableLoginByWam $false -ErrorAction SilentlyContinue | Out-Null
+    }
+    catch { }
 
     # Check if already connected
     $context = Get-AzContext -ErrorAction SilentlyContinue
@@ -49,14 +55,14 @@ function Connect-AzureKeyVault {
         if ($SubscriptionId -and $context.Subscription.Id -ne $SubscriptionId) {
             Write-AutopilotLog -Level Info -Message "Switching to specified subscription: $SubscriptionId" -Phase 'Authentication'
             try {
-                Set-AzContext -SubscriptionId $SubscriptionId -ErrorAction Stop | Out-Null
+                $context = (Set-AzContext -SubscriptionId $SubscriptionId -ErrorAction Stop)
             }
             catch {
                 throw "Failed to switch to subscription '$SubscriptionId': $($_.Exception.Message)"
             }
         }
 
-        return $true
+        return $context
     }
 
     # Not connected - initiate device code flow
@@ -65,15 +71,6 @@ function Connect-AzureKeyVault {
     Write-Host "Azure authentication required for Key Vault access." -ForegroundColor Yellow
     Write-Host "Please follow the device code instructions below:" -ForegroundColor Yellow
     Write-Host ""
-
-    # Disable WAM broker at the Az module level to prevent token cache issues during OOBE
-    try {
-        Update-AzConfig -EnableLoginByWam $false -ErrorAction SilentlyContinue | Out-Null
-    }
-    catch {
-        # Fallback for older Az.Accounts versions
-        $env:AZURE_BROKER_ENABLED = '0'
-    }
 
     $connectParams = @{
         DeviceCode  = $true
@@ -89,14 +86,13 @@ function Connect-AzureKeyVault {
     }
 
     try {
-        Connect-AzAccount @connectParams | Out-Null
+        $connectResult = Connect-AzAccount @connectParams
+        $context = $connectResult.Context
     }
     catch {
         throw "Azure authentication failed: $($_.Exception.Message)"
     }
 
-    # Verify connection
-    $context = Get-AzContext -ErrorAction SilentlyContinue
     if (-not $context) {
         throw "Azure authentication completed but no context is available"
     }
@@ -107,5 +103,5 @@ function Connect-AzureKeyVault {
         TenantId     = $context.Tenant.Id
     }
 
-    return $true
+    return $context
 }
