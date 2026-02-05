@@ -26,11 +26,8 @@ Write-Host "Autopilot OOBE Bootstrap" -ForegroundColor Cyan
 Write-Host "========================" -ForegroundColor Cyan
 Write-Host ""
 
-# Configuration - GitHub raw URLs for the module (public repo)
-$ModuleSource = 'https://raw.githubusercontent.com/AunalyticsManagedServices/autopilot/main/src'
-$ConfigUrl = 'https://raw.githubusercontent.com/AunalyticsManagedServices/autopilot/main/config/autopilot.config.psd1'
-
-# Alternatively, use local paths if module is pre-staged
+# Configuration
+$RepoZipUrl = 'https://github.com/AunalyticsManagedServices/autopilot/archive/refs/heads/main.zip'
 $LocalModulePath = 'C:\Autopilot\src'
 $LocalConfigPath = 'C:\Autopilot\config\autopilot.config.psd1'
 
@@ -51,34 +48,34 @@ try {
         Import-Module "$LocalModulePath\Autopilot.psd1" -Force
     }
     else {
-        # Download module from remote source
-        Write-Host "Downloading module from: $ModuleSource" -ForegroundColor Yellow
+        # Download entire repo as zip and extract
+        Write-Host "Downloading module from GitHub..." -ForegroundColor Yellow
 
-        $tempModulePath = Join-Path $env:TEMP 'Autopilot'
-        if (Test-Path $tempModulePath) {
-            Remove-Item $tempModulePath -Recurse -Force
-        }
-        New-Item -Path $tempModulePath -ItemType Directory -Force | Out-Null
+        $tempDir = Join-Path $env:TEMP 'AutopilotDownload'
+        $zipPath = Join-Path $env:TEMP 'autopilot.zip'
 
-        # Download module files (this is a simplified example - in production,
-        # consider using a zip file or proper module repository)
-        $files = @(
-            'Autopilot.psd1',
-            'Autopilot.psm1'
-            # Add other files as needed
-        )
+        # Clean up any previous downloads
+        if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force }
+        if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 
-        foreach ($file in $files) {
-            $url = "$ModuleSource/$file"
-            $dest = Join-Path $tempModulePath $file
-            Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
-        }
+        # Download and extract
+        Invoke-WebRequest -Uri $RepoZipUrl -OutFile $zipPath -UseBasicParsing
+        Expand-Archive -Path $zipPath -DestinationPath $tempDir -Force
 
-        Import-Module "$tempModulePath\Autopilot.psd1" -Force
+        # GitHub extracts to autopilot-main/ folder
+        $extractedPath = Join-Path $tempDir 'autopilot-main'
+        $modulePath = Join-Path $extractedPath 'src'
+        $configPath = Join-Path $extractedPath 'config\autopilot.config.psd1'
+
+        Write-Host "Module downloaded and extracted" -ForegroundColor Green
+
+        Import-Module "$modulePath\Autopilot.psd1" -Force
+
+        # Clean up zip
+        Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
     }
 
-    # Check for local config
-    $configPath = $null
+    # Check for local config (override extracted config if local exists)
     if (Test-Path $LocalConfigPath) {
         Write-Host "Using local configuration: $LocalConfigPath" -ForegroundColor Green
         $configPath = $LocalConfigPath
