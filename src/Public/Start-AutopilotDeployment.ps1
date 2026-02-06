@@ -266,6 +266,19 @@ function Start-AutopilotDeployment {
             }
         }
 
+        # Force a time sync to prevent clock skew issues during enrollment
+        Write-AutopilotLog -Level Info -Message "Forcing time synchronization" -Phase 'Registration'
+        try {
+            $syncResult = w32tm /resync /force 2>&1
+            Write-AutopilotLog -Level Info -Message "Time sync completed: $syncResult" -Phase 'Registration'
+        }
+        catch {
+            Write-AutopilotLog -Level Warning -Message "Time sync failed - continuing anyway" -Phase 'Registration' -Data @{
+                Error = $_.Exception.Message
+            }
+            # Non-fatal - continue
+        }
+
         $state.AdvanceTo([DeploymentPhase]::OOBELaunch)
 
         # Re-enable WAM before AutopilotOOBE - it uses its own interactive
